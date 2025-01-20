@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import StackingRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 import plotly.express as px
 import requests
 
@@ -23,21 +22,41 @@ def load_data(file_path):
         st.error("File not found. Please check the file path.")
         return None
 
-# Fetch Live Match Data
-def fetch_live_data(api_url):
+# Fetch Live Match Data from Native Stats API
+# Fetch Live Match Data from Native Stats API
+def fetch_live_data(api_url, api_key):
     st.write("### Fetching Live Data")
+    headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        response = requests.get(api_url)
+        response = requests.get(api_url, headers=headers)
+        st.write(f"Status Code: {response.status_code}")  # Log status code for debugging
+
         if response.status_code == 200:
-            live_data = response.json()
-            st.success("Live data fetched successfully.")
-            return pd.json_normalize(live_data['elements'])
+            try:
+                live_data = response.json()
+                st.success("Live data fetched successfully.")
+                # Normalize JSON response if needed
+                if 'elements' in live_data:
+                    return pd.json_normalize(live_data['elements'])
+                else:
+                    return pd.json_normalize(live_data)
+            except ValueError:
+                st.error("Failed to parse JSON response. Please check the API format.")
+                st.write(f"Response content: {response.text}")  # Log raw response
+                return None
+        elif response.status_code == 401:
+            st.error("Unauthorized. Please check your API key.")
+        elif response.status_code == 404:
+            st.error("API endpoint not found. Please check the API URL.")
         else:
-            st.error(f"Failed to fetch live data. Status code: {response.status_code}")
-            return None
-    except Exception as e:
+            st.error(f"Failed to fetch live data. HTTP {response.status_code}: {response.reason}")
+            st.write(f"Response content: {response.text}")  # Log raw response
+
+        return None
+    except requests.exceptions.RequestException as e:
         st.error(f"An error occurred while fetching live data: {e}")
         return None
+
 
 # Data Exploration and Visualization
 def explore_data(data):
@@ -185,10 +204,11 @@ def main():
 
     st.sidebar.title("Settings")
     file_path = "C:\\Users\\Rufeeh\\OneDrive\\Desktop\\Africa-Data-School-Curriculum\\players.csv"
-    api_url = st.sidebar.text_input("Enter API URL:", "https://fantasy.premierleague.com/api/bootstrap-static/")
+    api_url = "https://native-stats.org/competition/PL/"
+    api_key = "a641f61f46ab4d6596102212034ad513"
 
     if st.sidebar.button("Fetch Live Data"):
-        live_data = fetch_live_data(api_url)
+        live_data = fetch_live_data(api_url, api_key)
         if live_data is not None:
             explore_data(live_data)
 
